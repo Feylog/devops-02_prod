@@ -104,3 +104,35 @@
   ansible.builtin.systemd:
     name: kubelet
     enabled: yes
+
+- name: Allow internal cluster traffic in UFW
+  community.general.ufw:
+    rule: allow
+    src: "10.10.0.0/24"
+
+- name: Allow Kubernetes API server (control-plane)
+  community.general.ufw:
+    rule: allow
+    port: "6443"
+    proto: tcp
+  when: "'control_plane' in group_names"
+
+- name: Allow etcd ports (control-plane)
+  community.general.ufw:
+    rule: allow
+    port: "2379:2380"
+    proto: tcp
+  when: "'control_plane' in group_names"
+
+- name: Allow kubelet port (all nodes)
+  community.general.ufw:
+    rule: allow
+    port: "10250"
+    proto: tcp
+
+- name: Allow NodePort range (workers)
+  community.general.ufw:
+    rule: allow
+    port: "30000:32767"
+    proto: tcp
+  when: "'workers' in group_names"
