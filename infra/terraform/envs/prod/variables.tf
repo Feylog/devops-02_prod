@@ -12,8 +12,3 @@ variable "vm_user" {
   type    = string
   default = "ubuntu"
 }
-
-variable "vm_name" {
-  type    = string
-  default = "devops-01"
-}
