@@ -1,8 +1,25 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/ansible/ansible-lint/main/src/ansiblelint/schemas/playbook.json
 ---
 - name: Prepare all cluster nodes
   hosts: kube_cluster
   become: true
-
   roles:
     - common
     - kubeadm
+
+- name: Bootstrap control plane
+  hosts: control_plane
+  become: true
+  vars:
+    kubernetes_version: "1.30"
+    pod_network_cidr: "192.168.0.0/16"
+  tasks:
+    - name: Run kubeadm init tasks
+      ansible.builtin.include_tasks: roles/kubeadm/tasks/init.yml
+
+- name: Join workers to cluster
+  hosts: workers
+  become: true
+  tasks:
+    - name: Run kubeadm join tasks
+      ansible.builtin.include_tasks: roles/kubeadm/tasks/join.yml
