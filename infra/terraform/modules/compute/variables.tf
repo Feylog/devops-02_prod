@@ -8,9 +8,11 @@ variable "name_prefix" {
   default = "devops"
 }
 
-variable "vm_name" {
-  type    = string
-  default = "devops-vm"
+variable "vms" {
+  type = map(object({
+    public_ip = bool
+  }))
+  description = "Map of VM name to config. public_ip controls static external IP."
 }
 
 variable "vm_user" {

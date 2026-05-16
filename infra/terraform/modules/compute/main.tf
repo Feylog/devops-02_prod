@@ -1,5 +1,12 @@
+locals {
+  vms_with_public_ip = {
+    for name, cfg in var.vms : name => cfg if cfg.public_ip
+  }
+}
+
 resource "yandex_vpc_address" "static_ip" {
-  name = "${var.name_prefix}-static-ip"
+  for_each = local.vms_with_public_ip
+  name     = "${var.name_prefix}-${each.key}-ip"
 
   external_ipv4_address {
     zone_id = var.zone
@@ -11,7 +18,8 @@ data "yandex_compute_image" "ubuntu" {
 }
 
 resource "yandex_compute_instance" "vm" {
-  name        = var.vm_name
+  for_each    = var.vms
+  name        = "${var.name_prefix}-${each.key}"
   platform_id = "standard-v3"
   zone        = var.zone
 
@@ -30,8 +38,8 @@ resource "yandex_compute_instance" "vm" {
 
   network_interface {
     subnet_id      = var.subnet_id
-    nat            = true
-    nat_ip_address = yandex_vpc_address.static_ip.external_ipv4_address[0].address
+    nat            = each.value.public_ip
+    nat_ip_address = each.value.public_ip ? yandex_vpc_address.static_ip[each.key].external_ipv4_address[0].address : null
   }
 
   metadata = {
