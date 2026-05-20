@@ -1,0 +1,31 @@
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: vault-quota
+  namespace: vault
+spec:
+  hard:
+    requests.cpu: "500m"
+    requests.memory: "1Gi"
+    limits.cpu: "1"
+    limits.memory: "2Gi"
+    pods: "5"
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: vault-limits
+  namespace: vault
+spec:
+  limits:
+    - type: Container
+      default:
+        cpu: "100m"
+        memory: "128Mi"
+      defaultRequest:
+        cpu: "50m"
+        memory: "64Mi"
+      max:
+        cpu: "500m"
+        memory: "1Gi"

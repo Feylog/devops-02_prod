@@ -24,3 +24,42 @@
         --selector=app.kubernetes.io/component=controller
         --timeout=180s
       changed_when: false
+    - name: Ensure manifests directory exists
+      ansible.builtin.file:
+        path: /home/ubuntu/manifests
+        state: directory
+        owner: ubuntu
+        group: ubuntu
+        mode: '0755'
+
+    - name: Copy namespace manifest to control-plane
+      ansible.builtin.copy:
+        src: ../../k8s/namespaces/00-namespaces.yaml
+        dest: /home/ubuntu/manifests/00-namespaces.yaml
+        owner: ubuntu
+        group: ubuntu
+        mode: '0644'
+
+    - name: Apply namespaces
+      ansible.builtin.command: kubectl apply -f /home/ubuntu/manifests/00-namespaces.yaml
+      changed_when: false
+
+    - name: Copy namespace resource manifests
+      ansible.builtin.copy:
+        src: "../../k8s/namespaces/{{ item }}/"
+        dest: "/home/ubuntu/manifests/{{ item }}/"
+        owner: ubuntu
+        group: ubuntu
+        mode: '0644'
+      loop:
+        - app
+        - monitoring
+        - vault
+
+    - name: Apply namespace resources
+      ansible.builtin.command: "kubectl apply -f /home/ubuntu/manifests/{{ item }}/"
+      changed_when: false
+      loop:
+        - app
+        - monitoring
+        - vault
