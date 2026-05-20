@@ -21,15 +21,18 @@
       - ufw
     state: present
 
-- name: Enable UFW and allow SSH
+- name: Allow SSH in UFW
   community.general.ufw:
     rule: allow
     port: "22"
     proto: tcp
-    state: enabled
 
 - name: Allow node_exporter in UFW
   community.general.ufw:
     rule: allow
     port: "9100"
     proto: tcp
+
+- name: Enable UFW
+  community.general.ufw:
+    state: enabled

@@ -1,0 +1,26 @@
+---
+- name: Install cluster addons
+  hosts: control_plane
+  become: false
+  vars:
+    ingress_nginx_version: "controller-v1.11.2"
+  tasks:
+    - name: Check if ingress-nginx is installed
+      ansible.builtin.command: kubectl get namespace ingress-nginx
+      register: ingress_ns_check
+      failed_when: false
+      changed_when: false
+
+    - name: Install ingress-nginx controller
+      ansible.builtin.command: >
+        kubectl apply -f
+        https://raw.githubusercontent.com/kubernetes/ingress-nginx/{{ ingress_nginx_version }}/deploy/static/provider/baremetal/deploy.yaml
+      when: ingress_ns_check.rc != 0
+
+    - name: Wait for ingress-nginx controller to be ready
+      ansible.builtin.command: >
+        kubectl wait --namespace ingress-nginx
+        --for=condition=ready pod
+        --selector=app.kubernetes.io/component=controller
+        --timeout=180s
+      changed_when: false

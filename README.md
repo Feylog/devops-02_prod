@@ -143,3 +143,34 @@ Internet → app-service → app-deployment (FastAPI pods)
                          mysql-service → mysql-deployment (MySQL pod)
                               ↓
                          PersistentVolume (data survives restarts)
+
+
+Стартуем с terraform, генерируем токен
+  yc iam create-token
+добавляем его в файл по пути
+  nano ~/projects/devops-02_prod/infra/terraform/envs/staging/terraform.tfvars
+Начинаем
+  cd ~/projects/devops-02_prod/infra/terraform/envs/staging
+  terraform apply
+
+переходим в ansible и изменяем файл по пути, Прописываем там новые ip
+  nano ~/projects/devops-02_prod/infra/ansible/inventory/host.yml
+Проверяем агента
+  ssh-add -l || (eval $(ssh-agent) && ssh-add ~/.ssh/devops01)
+Проверяем доступность
+  cd ~/projects/devops-02_prod/infra/ansible
+  ansible -i inventory/host.yml kube_cluster -m ping
+запускаем playbook
+  ansible-playbook -i inventory/host.yml cluster.yml
+проверяем запуск кластеров
+  ssh -i ~/.ssh/devops01 ubuntu@IP "kubectl get nodes && kubectl get pods -A"
+
+nginx-ingress
+подключаемся к нашей вм
+  ssh -i ~/.ssh/devops01 ubuntu@51.250.8.28
+устанавливаем
+  kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.11.2/deploy/static/provider/baremetal/deploy.yaml
+смотрим, что все поднято
+  kubectl get pods -n ingress-nginx --watch
+проверяем сервис, что все взято
+  kubectl get svc -n ingress-nginx
