@@ -24,7 +24,7 @@ class Settings(BaseSettings):
 
     # URL shortener behavior
     base_url: str = "http://localhost:8000"
-    id_offset: int = 100_000_000
+    id_offset: int = 916_132_832  # 62^5: first ID that produces a 6-char base62 code
 
     # App metadata
     app_name: str = "url-shortener"
