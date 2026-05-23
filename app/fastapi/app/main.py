@@ -1,72 +1,84 @@
-import os
-import aiomysql
-import asyncio
+"""FastAPI application entry point.
+
+Composes the URL shortener service from the modules in this package:
+- core/config.py: typed settings from env
+- db/session.py: SQLAlchemy engine + session factory
+- cache/redis_client.py: pooled Redis client
+- routers/urls.py: shorten/redirect/stats endpoints
+- routers/health.py: /healthz and /readyz
+
+Run locally with:
+    uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+
+Run in production via the container's Dockerfile CMD.
+"""
+
+import logging
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
-from fastapi.responses import JSONResponse
+from sqlalchemy import text
 
-# Config
-DB_HOST = os.getenv("DB_HOST", "localhost")
-DB_PORT = int(os.getenv("DB_PORT", "3306"))
-DB_USER = os.getenv("DB_USER", "app")
-DB_PASS = os.getenv("DB_PASS", "secret")
-DB_NAME = os.getenv("DB_NAME", "devops01")
+from app.cache.redis_client import redis_client
+from app.core.config import settings
+from app.db.session import SessionLocal, engine
+from app.routers import health, urls
 
-# App
-app = FastAPI(title="DevOps-01 API", version="1.0.0")
-pool = None
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=settings.log_level)
 
-# Endpoints
-@app.get("/")
-def root():
-    return {"app": "devops-01", "version": "1.0.0"}
 
-@app.get("/healthz")
-def healthz():
-    return {"status": "ok"}
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Startup + shutdown hooks bound to the app's lifetime."""
 
-@app.get("/readyz")
-async def readyz():
-    if pool is None:
-        return JSONResponse(status_code=503, content={"status": "no db"})
+    # --- Startup ---
+    logger.info(
+        "Starting %s v%s in %s mode",
+        settings.app_name,
+        settings.app_version,
+        settings.environment,
+    )
+
+    # Best-effort DB ping at startup. Don't fail startup if it's down;
+    # /readyz will reflect the state. The pod stays up; traffic stays away
+    # until the DB recovers.
     try:
-        async with pool.acquire() as conn:
-            async with conn.cursor() as cur:
-                await cur.execute("SELECT 1")
-        return {"status": "ok"}
+        db = SessionLocal()
+        db.execute(text("SELECT 1"))
+        db.close()
+        logger.info("MySQL: reachable at startup")
+    except Exception as exc:
+        logger.warning("MySQL: unreachable at startup (%s) — /readyz will reflect", exc)
+
+    # Same for Redis.
+    try:
+        redis_client.ping()
+        logger.info("Redis: reachable at startup")
+    except Exception as exc:
+        logger.warning(
+            "Redis: unreachable at startup (%s) — falling back to DB on cache miss", exc
+        )
+
+    yield  # ← app runs while we're paused here
+
+    # --- Shutdown ---
+    logger.info("Shutting down")
+    engine.dispose()  # closes all pooled DB connections
+    try:
+        redis_client.close()
     except Exception:
-        return JSONResponse(status_code=503, content={"status": "db error"})
-@app.get("/items")
-async def get_items():
-    async with pool.acquire() as conn:
-        async with conn.cursor() as cur:
-            await cur.execute("SELECT id, name, created_at FROM items")
-            rows = await cur.fetchall()
-    return {"items": [{"id": r[0], "name": r[1], "created_at": str(r[2])} for r in rows]}
+        pass  # don't crash shutdown on Redis cleanup errors
 
-@app.post("/items")
-async def create_item(name: str):
-    async with pool.acquire() as conn:
-        async with conn.cursor() as cur:
-            await cur.execute("INSERT INTO items (name) VALUES (%s)", (name,))
-            await conn.commit()
-    return {"item": name, "status": "created"}
 
-@app.on_event("startup")
-async def startup():
-    global pool
-    for i in range(10):
-        try:
-            pool = await aiomysql.create_pool(
-                host=DB_HOST,
-                port=DB_PORT,
-                user=DB_USER,
-                password=DB_PASS,
-                db=DB_NAME
-            )
-            print("Connected to MySQL")
-            return
-        except Exception as e:
-            print(f"MySQL not ready, retry {i+1}/10: {e}")
-            await asyncio.sleep(2)
-    print("Could not connect to MySQL after 10 retries")
+app = FastAPI(
+    title=settings.app_name,
+    version=settings.app_version,
+    lifespan=lifespan,
+)
+
+# Order matters at runtime but not in include_router calls — FastAPI
+# preserves the order within each router. We mount health endpoints
+# first because they're operationally important.
+app.include_router(health.router, tags=["health"])
+app.include_router(urls.router, tags=["urls"])
