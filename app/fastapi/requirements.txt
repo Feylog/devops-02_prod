@@ -19,3 +19,4 @@ alembic==1.14.0
 
 # URL validation
 pydantic[email]==2.12.5
+requests==2.32.3
