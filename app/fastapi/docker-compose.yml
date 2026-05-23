@@ -50,6 +50,40 @@ services:
       interval: 5s
       timeout: 3s
       retries: 5
+  app:
+    build:
+      context: .
+      # No dockerfile: needed (Dockerfile is default)
+    image: url-shortener:dev
+    container_name: url-shortener-app
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: mysql+pymysql://app:secret@mysql:3306/urlshort
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      BASE_URL: http://localhost:8000
+      ENVIRONMENT: local
+      LOG_LEVEL: INFO
+    ports:
+      - "8000:8000"
+    volumes:
+      # Live-reload dev convenience: mount source into the container so
+      # changes are reflected without rebuild. Comment this out (and the
+      # --reload flag below) to test the production-shaped image.
+      - ./app:/app/app:ro
+    command:
+      - uvicorn
+      - app.main:app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+      - --reload
 
 volumes:
   mysql_data:
