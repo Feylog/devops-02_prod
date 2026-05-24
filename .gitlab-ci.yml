@@ -8,10 +8,6 @@ stages:
 
 variables:
   IMAGE_BASE: $CI_REGISTRY_IMAGE/url-shortener
-  DOCKER_HOST: tcp://docker:2376
-  DOCKER_TLS_CERTDIR: "/certs"
-  DOCKER_DRIVER: overlay2
-  DOCKER_BUILDKIT: "1"
 
 # Build the FastAPI image and push two tags:
 #   - <branch>-<short-sha>  : immutable, traces to one commit
@@ -21,12 +17,14 @@ build:image:
   image: docker:27
   services:
     - name: docker:27-dind
-      # Self-hosted GitLab on a sslip.io domain uses a self-signed cert
-      # that the DinD daemon doesn't trust by default. Marking the
-      # registry as "insecure" lets the daemon talk to it without
-      # cert verification. Safe here because the registry is on the
-      # same private network as the runner.
-      command: ["--insecure-registry=registry.gitlab.89.169.144.7.sslip.io"]
+      command:
+        - "--tls=false"
+        - "--insecure-registry=registry.gitlab.89.169.144.7.sslip.io"
+  variables:
+    DOCKER_HOST: tcp://docker:2375
+    DOCKER_TLS_CERTDIR: ""
+    DOCKER_DRIVER: overlay2
+    DOCKER_BUILDKIT: "1"
   before_script:
     - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
   script:
