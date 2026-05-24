@@ -9,7 +9,7 @@
 
     fastapi, dockerfile, тесты.
 
-  k8s/ - кубер манифесты
+  k8s/ - kubernetes манифесты
 
   monitoring/ - наблюдаемость
 
