@@ -20,7 +20,13 @@ build:image:
   stage: build
   image: docker:27
   services:
-    - docker:27-dind
+    - name: docker:27-dind
+      # Self-hosted GitLab on a sslip.io domain uses a self-signed cert
+      # that the DinD daemon doesn't trust by default. Marking the
+      # registry as "insecure" lets the daemon talk to it without
+      # cert verification. Safe here because the registry is on the
+      # same private network as the runner.
+      command: ["--insecure-registry=registry.gitlab.89.169.144.7.sslip.io"]
   before_script:
     - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
   script:
